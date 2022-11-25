@@ -1,13 +1,14 @@
-use std::{io::{Write, Read}, path::Path, default, fs::File};
+use std::{io::{Write, Read, Seek}, path::Path, default, fs::File};
 
-use walkdir::WalkDir;
-use zip::write::FileOptions;
+use walkdir::{WalkDir, DirEntry};
+use zip::{write::FileOptions, result::ZipError};
 
 pub fn main(){
     let args :Vec<_> = std::env::args().collect();
     let mut src_dir = "";
     let mut entrypoint = "";
     let mut ct = 0;
+    //handle arguments and options
     for arg in args.iter(){
         if !arg.starts_with("--") {
             ct=ct+1;
@@ -18,9 +19,6 @@ pub fn main(){
             _default => (),
         }
     }
-    let path = std::path::Path::new("tmp_zipped_src.zip");
-    //println!("Path is: {}", path.canonicalize().unwrap().to_str().unwrap());
-    let output_file = std::fs::File::create(&path).unwrap();
     
 
     if !Path::new(src_dir).is_dir() {
@@ -28,38 +26,65 @@ pub fn main(){
         return;
     }
 
-    let walkdir = WalkDir::new(src_dir);
-    let iterator = walkdir.into_iter();
+    zip_directory(src_dir, "temp_zipped_src.zip", zip::CompressionMethod::Deflated).unwrap();
+    
+    
+}
 
+fn zip_dir<T>(
+    it: &mut dyn Iterator<Item = DirEntry>,
+    prefix: &str,
+    writer: T,
+    method: zip::CompressionMethod,
+) -> zip::result::ZipResult<()>
+where
+    T: Write + Seek,
+{
+    let mut zip = zip::ZipWriter::new(writer);
+    let options = FileOptions::default()
+        .compression_method(method)
+        .unix_permissions(0o755);
 
-
-
-    let mut zip = zip::ZipWriter::new(output_file);
-
-    let opts = FileOptions::default();
     let mut buffer = Vec::new();
-    for f in iterator {
-        let in_dir_object = f.expect("could not iterate through directory!");
-        let p = in_dir_object.path();
-        let name = p.strip_prefix(Path::new(&src_dir)).unwrap();
+    for entry in it {
+        let path = entry.path();
+        let name = path.strip_prefix(Path::new(prefix)).unwrap();
 
-        if p.is_file(){
-            println!("Debug: adding file {:?} as {:?} ...", p, name );
+        if path.is_file() {
+            println!("adding file {:?} as {:?} ...", path, name);
             #[allow(deprecated)]
-            zip.start_file_from_path(name, opts).unwrap();
-            let mut f = File::open(path).unwrap();
+            zip.start_file_from_path(name, options)?;
+            let mut f = File::open(path)?;
 
-            f.read_to_end(&mut buffer).unwrap();
-            zip.write_all(&*buffer).unwrap();
+            f.read_to_end(&mut buffer)?;
+            zip.write_all(&*buffer)?;
             buffer.clear();
-        }   else if !name.as_os_str().is_empty(){
-            println!("adding dir {:?} as {:?} ...", p, name);
-            #[allow(deprecated)]
-            zip.add_directory_from_path(name, opts).unwrap();
+        } else if !name.as_os_str().is_empty() {
+            println!("adding dir {:?} as {:?} ...", path, name);
+            #[allow(deprecated)] //this is the reason for every file/subfolder, the whole write action is redone. After add_directory, the ZipWriter cannot add anything to the file
+            zip.add_directory_from_path(name, options)?;
         }
     }
+    zip.finish()?;
+    Result::Ok(())
+}
 
-    zip.finish().unwrap();
-    
-    
+fn zip_directory(
+    src_dir: &str,
+    dst_file: &str,
+    method: zip::CompressionMethod,
+) -> zip::result::ZipResult<()> {
+    if !Path::new(src_dir).is_dir() {
+        return Err(ZipError::FileNotFound);
+    }
+
+    let path = Path::new(dst_file);
+    let file = File::create(path).unwrap();
+
+    let walkdir = WalkDir::new(src_dir);
+    let it = walkdir.into_iter();
+
+    zip_dir(&mut it.filter_map(|e| e.ok()), src_dir, file, method)?;
+
+    Ok(())
 }
