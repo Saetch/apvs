@@ -36,7 +36,7 @@ pub fn main(){
 
     let mut zip = zip::ZipWriter::new(output_file);
 
-    let opts = FileOptions::default();
+    let opts = FileOptions::default().compression_method(zip::CompressionMethod::Deflated).unix_permissions(0o777);
     let mut buffer = Vec::new();
     for f in iterator {
         let in_dir_object = f.expect("could not iterate through directory!");
@@ -47,7 +47,7 @@ pub fn main(){
             println!("Debug: adding file {:?} as {:?} ...", p, name );
             #[allow(deprecated)]
             zip.start_file_from_path(name, opts).unwrap();
-            let mut f = File::open(path).unwrap();
+            let mut f = File::open(p).unwrap();
 
             f.read_to_end(&mut buffer).unwrap();
             zip.write_all(&*buffer).unwrap();
