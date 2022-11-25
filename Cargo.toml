@@ -4,13 +4,24 @@ version = "0.1.0"
 edition = "2021"
 
 
-
 [[bin]]
 name = "client"
+path = "./src/bin/client/client.rs"
 test = false
 bench = false
 
 
+[[bin]]
+name = "receiver"
+path = "./src/bin/receiver/receiver.rs"
+test = false
+bench = false
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tokio = { version = "1.22.0", features = ["full"] }
+tokio-stream = "0.1.11"
+actix-web = "4.2.1"
+zip = "0.6.3"
+walkdir = "2.3.2"
