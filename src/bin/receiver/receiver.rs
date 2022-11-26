@@ -1,7 +1,8 @@
 use std::{sync::{Arc, Weak}, future::Future, time::Duration, error::Error};
-use actix_web::{get, post, web::{self, Bytes}, HttpResponse, HttpServer, App, Responder, FromRequest, dev::{Server, ServerHandle}, body::BoxBody, error};
+use actix_web::{get, post, web::{self, Bytes, Data}, HttpResponse, HttpServer, App, Responder, FromRequest, dev::{Server, ServerHandle}, body::BoxBody, error, HttpRequest};
+use actix_web_lab::web::redirect;
 use flume::{Receiver, r#async};
-use tokio::{join, try_join};
+use tokio::{join, try_join, sync::RwLock, time::sleep};
 
 struct State{
     i: u16,
@@ -14,33 +15,49 @@ async fn hello() -> impl Responder {
 }
 
 
-async fn upload(req_body: Bytes) -> impl Responder {
-    HttpResponse::Ok().body("Received without error!")
-   /* let mut data : Vec<u8> = req_body.into_iter().collect(); 
+async fn upload(data: Data<RwLock<State>>, req_body: Bytes) -> impl Responder {
+    let newi = data.read().await.i +1;
+
+    data.write().await.i = newi;
+    println!("{}", newi);
+   
+    let mut data : Vec<u8> = req_body.into_iter().collect(); 
     for u in data {
         print!("{}-", u);
     }
-
-    HttpResponse::Ok().body("Received without error!")*/
+    println!("Handled upload call!");
+    HttpResponse::Ok().body("Received without error! This is amazing!")
 }
 
-async fn upload_get()-> impl Responder{
+async fn upload_get(data: Data<RwLock<State>>)-> impl Responder{
 
-    HttpResponse::Ok().body("This worked!")
+    let newi = data.read().await.i +1; 
+    data.write().await.i = newi;
+    HttpResponse::Ok().body("This worked! ".to_owned()+&newi.to_string())
+
+}
+
+async fn default() -> impl Responder{
+
+
+    sleep(Duration::from_secs(630)).await;
+    HttpResponse::Ok().body("This is the default site!")
 }
 
 async fn communication_loop(handle: ServerHandle)-> Result<(), std::io::Error>{
     
     
-    tokio::time::sleep(Duration::from_secs(150)).await;
+    tokio::time::sleep(Duration::from_secs(700)).await;
     handle.stop(true).await;
     Ok(())
 }
 
-#[actix_web::main] //this could be actix_web::main, as well, but we don't need the additional workers
+#[tokio::main] //this could be actix_web::main, aswell, but we don't need the additional workers
 async fn main() -> std::io::Result<()> {
 
-    let srv =  HttpServer::new(|| {
+    let data = Data::new(RwLock::new(State{i: 0 }));
+
+    let srv =  HttpServer::new(move || {
 
         let json_cfg = web::JsonConfig::default()
         // limit request payload size
@@ -52,14 +69,18 @@ async fn main() -> std::io::Result<()> {
 
         App::new().app_data(json_cfg)
             .service(hello)
-            .service(web::scope("/check").app_data(State{i : 0}).service(web::resource("/upload").route(web::post().to(upload))))
+            .service(web::scope("/check").app_data(Data::clone(&data))
+                                .service(web::resource("/upload").route(web::post().to(upload))/*.route(web::get().to(upload_get))*/)
+                                .service(web::resource("/").route(web::get().to(default))))
     })
-    .bind(("127.0.0.1", 8080)).unwrap();
+    .client_disconnect_timeout(Duration::from_millis(0))
+    .client_request_timeout(Duration::from_millis(10000))
+    .bind(("0.0.0.0", 8080)).unwrap();
 
     let server = srv.run();
     let link = server.handle().clone();
     
-
+    println!("Starting webserver!");
     let res = try_join!(server, communication_loop(link));
     res.unwrap();
     println!("Shutting down without encountering any Errors!");

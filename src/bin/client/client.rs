@@ -1,9 +1,12 @@
-use std::{io::{Write, Read}, path::Path, default, fs::File};
+use std::{io::{Write, Read}, path::Path, default, fs::{File, read}, os, env::{self, var}};
 
+use actix_web::web::Bytes;
+use tokio::fs;
 use walkdir::WalkDir;
 use zip::write::FileOptions;
 
-pub fn main(){
+#[tokio::main]
+pub async fn main() -> std::io::Result<()>{
     let args :Vec<_> = std::env::args().collect();
     let mut src_dir = "";
     let mut entrypoint = "";
@@ -23,7 +26,7 @@ pub fn main(){
 
     if !Path::new(src_dir).is_dir() {
         println!("source specified is not a directory!: {}", Path::new(src_dir).to_str().unwrap());
-        return;
+        return Ok(());
     }
     let output_file = std::fs::File::create(&path).unwrap();
     
@@ -60,5 +63,20 @@ pub fn main(){
 
     zip.finish().unwrap();
     
+    let client = reqwest::Client::new();
     
+    let host = var("receiver").unwrap_or("localhost".to_string());
+    let port = std::env::var("receiver_port").unwrap_or("8080".to_string());
+    let payload = tokio::fs::read("tmp_zipped_src.zip").await.unwrap();
+    let path = std::env::var("receiver_path").unwrap_or("/check/upload".to_string());
+    
+
+    let complete_target ="http://".to_owned()+ &host + ":" +&port + &path;
+
+    println!("Sending request to: {}", complete_target);
+    let resu = client.post(complete_target).body(payload).send().await;
+    println!("Result: {:?}", resu.unwrap());
+
+
+    return Ok(());
 }
