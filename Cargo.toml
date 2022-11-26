@@ -24,4 +24,6 @@ tokio = { version = "1.22.0", features = ["full"] }
 tokio-stream = "0.1.11"
 actix-web = "4.2.1"
 zip = "0.6.3"
+zip-extract = "0.1.1"
 walkdir = "2.3.2"
+mime = "0.3.16"

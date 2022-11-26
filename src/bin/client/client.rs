@@ -19,15 +19,14 @@ pub fn main(){
         }
     }
     let path = std::path::Path::new("tmp_zipped_src.zip");
-    //println!("Path is: {}", path.canonicalize().unwrap().to_str().unwrap());
-    let output_file = std::fs::File::create(&path).unwrap();
-    
+   
 
     if !Path::new(src_dir).is_dir() {
         println!("source specified is not a directory!: {}", Path::new(src_dir).to_str().unwrap());
         return;
     }
-
+    let output_file = std::fs::File::create(&path).unwrap();
+    
     let walkdir = WalkDir::new(src_dir);
     let iterator = walkdir.into_iter();
 
@@ -53,7 +52,7 @@ pub fn main(){
             zip.write_all(&*buffer).unwrap();
             buffer.clear();
         }   else if !name.as_os_str().is_empty(){
-            println!("adding dir {:?} as {:?} ...", p, name);
+            println!("Debug: adding dir {:?} as {:?} ...", p, name);
             #[allow(deprecated)]
             zip.add_directory_from_path(name, opts).unwrap();
         }

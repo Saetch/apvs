@@ -1,5 +1,4 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-
+use actix_web::{error, get, post, web::{self, Bytes}, App, HttpResponse, HttpServer, Responder, FromRequest};
 
 
 #[get("/")]
@@ -8,19 +7,36 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
+#[post("/check")]
+async fn echo(req_body: Bytes) -> impl Responder {
+    let mut data : Vec<u8> = req_body.into_iter().collect(); 
+    for u in data {
+        print!("{}-", u);
+    }
+
+    HttpResponse::Ok().body("Received without error!")
 }
 
 async fn manual_hello() -> impl Responder {
     HttpResponse::Ok().body("Hey there!")
 }
 
-#[actix_web::main]
+#[tokio::main] //this could be actix_web::main, as well, but we don't need the additional workers
 async fn main() -> std::io::Result<()> {
+
+
+    //tokio::spawn(future)
     HttpServer::new(|| {
-        App::new()
+
+        let json_cfg = web::JsonConfig::default()
+        // limit request payload size
+        .limit(2147483648) //#2GB
+        // use custom error handler
+        .error_handler(|err, _req| {
+            error::InternalError::from_response(err, HttpResponse::Conflict().into()).into()
+        });
+
+        App::new().app_data(json_cfg)
             .service(hello)
             .service(echo)
             .route("/hey", web::get().to(manual_hello))
