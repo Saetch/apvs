@@ -1,8 +1,11 @@
-use std::{sync::{Arc, Weak}, future::Future, time::Duration};
-use actix_web::{error, get, post, web::{self, Bytes}, HttpResponse, HttpServer, App, Responder, FromRequest, dev::{Server, ServerHandle}, body::BoxBody};
-use flume::Receiver;
-use tokio::join;
+use std::{sync::{Arc, Weak}, future::Future, time::Duration, error::Error};
+use actix_web::{get, post, web::{self, Bytes}, HttpResponse, HttpServer, App, Responder, FromRequest, dev::{Server, ServerHandle}, body::BoxBody, error};
+use flume::{Receiver, r#async};
+use tokio::{join, try_join};
 
+struct State{
+    i: u16,
+}
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -10,27 +13,28 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
-#[post("/check")]
-async fn echo(req_body: Bytes) -> impl Responder {
-    let mut data : Vec<u8> = req_body.into_iter().collect(); 
+
+async fn upload(req_body: Bytes) -> impl Responder {
+    HttpResponse::Ok().body("Received without error!")
+   /* let mut data : Vec<u8> = req_body.into_iter().collect(); 
     for u in data {
         print!("{}-", u);
     }
 
-    HttpResponse::Ok().body("Received without error!")
+    HttpResponse::Ok().body("Received without error!")*/
 }
 
-async fn manual_hello() -> impl Responder {
-    HttpResponse::Ok().body("Hey there!")
+async fn upload_get()-> impl Responder{
+
+    HttpResponse::Ok().body("This worked!")
 }
 
-
-async fn communication_loop(handle: ServerHandle){
+async fn communication_loop(handle: ServerHandle)-> Result<(), std::io::Error>{
     
     
-    tokio::time::sleep(Duration::from_secs(15)).await;
+    tokio::time::sleep(Duration::from_secs(150)).await;
     handle.stop(true).await;
-    ()
+    Ok(())
 }
 
 #[actix_web::main] //this could be actix_web::main, as well, but we don't need the additional workers
@@ -48,24 +52,17 @@ async fn main() -> std::io::Result<()> {
 
         App::new().app_data(json_cfg)
             .service(hello)
-            .service(echo)
-            .route("/hey", web::get().to(manual_hello))
+            .service(web::scope("/check").app_data(State{i : 0}).service(web::resource("/upload").route(web::post().to(upload))))
     })
     .bind(("127.0.0.1", 8080)).unwrap();
 
-   // let (sender, receiver) = flume::unbounded();
     let server = srv.run();
     let link = server.handle().clone();
     
-    println!("!SD");
 
-    //let arc2_s = arc_server.clone();
-    let res = join!(server, communication_loop(link));
-    res.0.unwrap();
-    //server.await.unwrap();
-    println!("fasfafasf");
-    //server.handle().stop(false);
-    //sender.send(server);
+    let res = try_join!(server, communication_loop(link));
+    res.unwrap();
+    println!("Shutting down without encountering any Errors!");
     return Ok(());
 }
 
