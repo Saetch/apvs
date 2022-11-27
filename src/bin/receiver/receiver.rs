@@ -14,6 +14,11 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
+async fn upload_uncompiled(data: Data<RwLock<State>>, posted: Bytes) -> impl Responder {
+    todo!();
+    HttpResponse::Ok().body("Sending to compiler worker!")
+}
+
 
 async fn upload(data: Data<RwLock<State>>, req_body: Bytes) -> impl Responder {
     let newi = data.read().await.i +1;
@@ -71,7 +76,9 @@ async fn main() -> std::io::Result<()> {
             .service(hello)
             .service(web::scope("/check").app_data(Data::clone(&data))
                                 .service(web::resource("/upload").route(web::post().to(upload))/*.route(web::get().to(upload_get))*/)
-                                .service(web::resource("/").route(web::get().to(default))))
+                                .service(web::resource("/").route(web::get().to(default)))
+                                .service(web::resource("uploadUncompiled").route(web::post().to(upload_uncompiled)))    
+                            )
     })
     .client_disconnect_timeout(Duration::from_millis(0))
     .client_request_timeout(Duration::from_millis(10000))

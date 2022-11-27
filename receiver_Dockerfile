@@ -9,8 +9,7 @@ RUN cargo build --bin receiver --release
 
 
 FROM debian:buster-slim
-RUN apt-get update \
-&& rm -rf /var/lib/apt/lists/*
+
 
 COPY --from=BUILDER /app/target/release/receiver /app/
 WORKDIR /app/
