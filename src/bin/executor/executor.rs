@@ -100,7 +100,7 @@ async fn upload(data: Data<RwLock<State>>, req_body: Bytes) -> impl Responder{
     docker.start_container(&name_c,  None::<StartContainerOptions<String>>).await.unwrap();
 
 
-    let c = Command::new("sh").arg("-c").arg("rm -rf execute executorBuildContext.tar").spawn().unwrap();
+    let _c = Command::new("sh").arg("-c").arg("rm -rf execute executorBuildContext.tar").spawn().unwrap();
     HttpResponse::Ok().body("Received without error! This is amazing!")
 }
 
