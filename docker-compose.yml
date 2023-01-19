@@ -7,12 +7,26 @@ services:
       context: ./
       args:
         timezone: ${TZ}
-    image: apvs_receiver
-    container_name: apvs_receiver
+    image: aps_receiver
+    container_name: aps_receiver
     restart: always
     ports:
        - "8080:8080"
     environment: 
+      TZ: ${TZ}
+    networks:
+      - apvs
+  executor:
+    build: 
+      dockerfile: executor_Dockerfile
+      context: ./
+      args:
+        timezone: ${TZ}
+    image: aps_executor
+    container_name: aps_executor
+    privileged: true
+    restart: always
+    environment:
       TZ: ${TZ}
     networks:
       - apvs

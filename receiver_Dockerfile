@@ -10,7 +10,7 @@ RUN cargo build --bin receiver --release
 
 FROM debian:buster-slim
 
-
+RUN apt-get update && apt-get install wget -yq && wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb && dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb  && rm -rf /var/lib/apt/lists/*
 COPY --from=BUILDER /app/target/release/receiver /app/
 WORKDIR /app/
 CMD ["./receiver"]

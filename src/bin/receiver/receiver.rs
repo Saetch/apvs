@@ -1,5 +1,5 @@
-use std::{sync::{Arc, Weak}, future::Future, time::Duration, error::Error};
-use actix_web::{get, post, web::{self, Bytes, Data}, HttpResponse, HttpServer, App, Responder, FromRequest, dev::{Server, ServerHandle}, body::BoxBody, error, HttpRequest};
+use std::{sync::{Arc, Weak}, future::Future, time::Duration, error::Error, env::var};
+use actix_web::{get, post, web::{self, Bytes, Data, BufMut}, HttpResponse, HttpServer, App, Responder, FromRequest, dev::{Server, ServerHandle}, body::BoxBody, error, HttpRequest};
 use actix_web_lab::web::redirect;
 use flume::{Receiver, r#async};
 use tokio::{join, try_join, sync::RwLock, time::sleep};
@@ -21,16 +21,33 @@ async fn upload_uncompiled(data: Data<RwLock<State>>, posted: Bytes) -> impl Res
 
 
 async fn upload(data: Data<RwLock<State>>, req_body: Bytes) -> impl Responder {
+    
     let newi = data.read().await.i +1;
 
     data.write().await.i = newi;
     println!("{}", newi);
    
-    let mut data : Vec<u8> = req_body.into_iter().collect(); 
-    for u in data {
+    let data : Vec<u8> = req_body.into_iter().collect(); 
+    for u in data.iter() {
         print!("{}-", u);
     }
     println!("Handled upload call!");
+
+    //TODO! Here multiple executors should be handled, to spread the workload
+
+
+    let client = reqwest::Client::new();
+    
+    let host = var("executor").unwrap_or("aps_executor".to_string());
+    let port = std::env::var("executor_port").unwrap_or("8080".to_string());
+    let payload = data;
+    let path = std::env::var("executor_path").unwrap_or("/execute/upload".to_string());
+    let complete_target ="http://".to_owned()+ &host + ":" +&port + &path;
+
+    let resu = client.post(complete_target).body(payload).send().await;
+    println!("Result: {:?}", resu.unwrap());
+
+
     HttpResponse::Ok().body("Received without error! This is amazing!")
 }
 

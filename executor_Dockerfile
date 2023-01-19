@@ -1,0 +1,35 @@
+FROM rust:alpine3.16 as BUILDER
+RUN apk upgrade && apk add --no-cache \
+        ca-certificates \
+        gcc \
+        openssl \
+         build-base \
+         musl-dev \
+         libc-dev \ 
+        openssl-dev \
+        pkgconfig 
+
+COPY ./src/bin/executor/ ./app/src/bin/executor
+COPY ./Cargo.toml ./Cargo.lock /app/
+WORKDIR /app/
+
+RUN cargo build --bin executor --release
+
+
+FROM docker:dind
+USER root
+COPY ./src/bin/executor/run.sh /app/run.sh
+RUN apk upgrade && apk add --no-cache \
+        ca-certificates \
+        gcc \
+        openssl \
+        openssl-dev \ 
+        pkgconfig
+
+
+COPY --from=BUILDER /app/target/release/executor /app/
+RUN chmod +x /app/*
+WORKDIR /app
+RUN apk update && apk add --no-cache supervisor openssh nginx
+COPY supervisord.conf /etc/supervisord.conf
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
