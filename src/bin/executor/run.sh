@@ -1,1 +1,0 @@
-docker run --name run -d run

@@ -1,4 +1,9 @@
 FROM rust:alpine3.16
+
+
+
+# This Dockerfile was used to create the image that was shown during the presentation to demonstrate the gains of multi-stage builds (as used for the executor image) in comparison with 
+# a single stage build (the result of building this image here). It is not used for the actual application. I'm leaving this here just for the context.
 RUN apk upgrade && apk add --no-cache \
         ca-certificates \
         gcc \
