@@ -1,10 +1,11 @@
-use std::{ time::Duration,  path::PathBuf, io::Cursor, process::Command};
+use std::{ time::Duration,  path::{PathBuf, Path}, io::Cursor, process::Command};
 use actix_web::{get, web::{self, Bytes, Data}, HttpResponse, HttpServer, App, Responder, error};
 use tokio::{ sync::RwLock};
 
 
 use bollard::{image::BuildImageOptions, container::{CreateContainerOptions, Config, StartContainerOptions}};
 use bollard::Docker;
+use walkdir::WalkDir;
 
 use std::collections::HashMap;
 
@@ -46,17 +47,43 @@ async fn upload(data: Data<RwLock<State>>, req_body: Bytes) -> impl Responder{
     let file = File::create("executorBuildContext.tar").unwrap();
     let mut a = Builder::new(file);
 
-    a.append_file("Dockerfile", &mut File::open("execute/Dockerfile").unwrap()).unwrap();
 
-    let app_f = File::open("execute/app.py");
-    if app_f.is_ok(){
-        a.append_file("app.py", &mut app_f.unwrap()).unwrap()
-    }
+    
+        let walkdir = WalkDir::new("execute");
+        let iterator = walkdir.into_iter();
 
-    let app_f = File::open("execute/requirements.txt");
-    if app_f.is_ok(){
-        a.append_file("requirements.txt", &mut app_f.unwrap()).unwrap()
-    }
+        for f in iterator {
+            let in_dir_object = f.expect("could not iterate through directory!");
+            let p = in_dir_object.path();
+            let name = p.strip_prefix(Path::new("execute")).unwrap();
+
+            if p.is_file(){
+                println!("Debug: adding file {:?} as {:?} ...", p, name );
+                a.append_file(name, &mut File::open(p).unwrap()).unwrap();
+            }   else if !name.as_os_str().is_empty(){
+                println!("Debug: adding dir {:?} as {:?} ...", p, name);
+                a.append_dir(name, p).unwrap();
+            }
+
+        }
+
+    
+    
+
+        /* This was the original implementation as for the presentation. Here only certain contexts were expected and worked correctly. This got improved in the lines above
+        a.append_file("Dockerfile", &mut File::open("execute/Dockerfile").unwrap()).unwrap();
+
+        let app_f = File::open("execute/app.py");
+        if app_f.is_ok(){
+            a.append_file("app.py", &mut app_f.unwrap()).unwrap()
+        }
+    
+        let app_f = File::open("execute/requirements.txt");
+        if app_f.is_ok(){
+            a.append_file("requirements.txt", &mut app_f.unwrap()).unwrap()
+        }
+        */
+
 
     a.finish().unwrap();
 

@@ -24,6 +24,8 @@ pub async fn main() -> std::io::Result<()>{
    
 
     if !Path::new(src_dir).is_dir() {
+
+        //This is for handling a single image to create a container based on that, but the upload takes too long and thus this was abandoned
         println!("Specifying single image: {}", Path::new(src_dir).to_str().unwrap());
         #[allow(unused_variables)]
         let src_dfile = src_dir;
